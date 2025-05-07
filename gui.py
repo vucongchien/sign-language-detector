@@ -25,7 +25,7 @@ num_classes = len(class_names)
 model = resnet18(pretrained=False)
 model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 
-model.load_state_dict(torch.load('sign_language_web/sign_language_model.pth', map_location=device))
+model.load_state_dict(torch.load('sign_language_web/sign_language_model_resnes.pth', map_location=device))
 model.eval()
 
 # === 3. Transform giống lúc validation ===
