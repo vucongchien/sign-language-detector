@@ -1,0 +1,23 @@
+# Bỏ qua thư mục cache Python
+__pycache__/
+*.py[cod]
+
+# Bỏ qua file checkpoint hoặc model lưu
+*.pth
+*.pt
+
+# Bỏ folder data (nếu không muốn đẩy dữ liệu lên GitHub)
+data/
+dataset/
+dataset_sieucappro*/
+sign_language_web/
+
+# Bỏ file notebook checkpoints
+*.ipynb_checkpoints
+
+# VSCode settings (nếu dùng VSCode)
+.vscode/
+
+# File hệ thống
+.DS_Store
+Thumbs.db
