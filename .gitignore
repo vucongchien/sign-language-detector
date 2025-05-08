@@ -2,10 +2,6 @@
 __pycache__/
 *.py[cod]
 
-# Bỏ qua file checkpoint hoặc model lưu
-*.pth
-*.pt
-
 # Bỏ folder data (nếu không muốn đẩy dữ liệu lên GitHub)
 data/
 dataset/
