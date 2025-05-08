@@ -10,7 +10,6 @@ __pycache__/
 data/
 dataset/
 dataset_sieucappro*/
-sign_language_web/
 
 # Bỏ file notebook checkpoints
 *.ipynb_checkpoints
