@@ -109,8 +109,10 @@ def index():
             tensor = transform(hand_pil).unsqueeze(0).to(device)
             with torch.no_grad():
                 out = model(tensor)
-                _, pred = torch.max(out,1)
-                prediction = class_names[pred.item()]
+                probs = torch.nn.functional.softmax(out, dim=1)
+                top3_prob, top3_idx = torch.topk(probs, 3)
+                prediction = [(class_names[i], float(p)*100) for i, p in zip(top3_idx[0], top3_prob[0])]
+
 
             # lưu lại ảnh đã crop để show
             hand_pil.save(path)

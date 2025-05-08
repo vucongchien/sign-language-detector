@@ -1,19 +1,22 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <title>Sign Language Test</title>
-</head>
-<body>
-  <h1>🖐️ Test Sign Language Model</h1>
-  <form method="POST" enctype="multipart/form-data">
-    <input type="file" name="file" accept="image/*" required>
-    <input type="submit" value="Upload & Predict">
-  </form>
-
-  {% if prediction %}
-    <h2>Result: {{ prediction }}</h2>
-    <img src="{{ url_for('static', filename='uploads/' ~ request.files['file'].filename) }}" width="300">
-  {% endif %}
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <title>Sign Language Test</title>
+  </head>
+  <body>
+    <h1>🖐️ Test Sign Language Model</h1>
+    <form method="POST" enctype="multipart/form-data">
+      <input type="file" name="file" accept="image/*" required />
+      <input type="submit" value="Upload & Predict" />
+    </form>
+    {% if prediction %}
+    <h3>Top 3 Predictions:</h3>
+    <ul>
+      {% for label, prob in prediction %}
+      <li>{{ label }}: {{ '%.2f'|format(prob) }}%</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </body>
 </html>
