@@ -4,8 +4,6 @@ __pycache__/
 
 # Bỏ folder data (nếu không muốn đẩy dữ liệu lên GitHub)
 data/
-dataset/
-dataset_sieucappro*/
 
 # Bỏ file notebook checkpoints
 *.ipynb_checkpoints

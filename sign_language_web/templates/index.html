@@ -17,6 +17,7 @@
       <li>{{ label }}: {{ '%.2f'|format(prob) }}%</li>
       {% endfor %}
     </ul>
+    <img src="{{ url_for('static', filename='uploads/' ~ request.files['file'].filename) }}" width="300">
     {% endif %}
   </body>
 </html>

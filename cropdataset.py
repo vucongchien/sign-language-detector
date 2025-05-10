@@ -2,58 +2,75 @@ import os
 from rembg import remove
 from PIL import Image
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import partial
+from itertools import chain
+from pathlib import Path
 
 # --- Cấu hình ---
-INPUT_DIR = 'dataset_sieucappro'             # thư mục gốc chứa train/ test
-OUTPUT_DIR = 'dataset_sieucappro_rembg'      # nơi lưu ảnh đã xử lý
-SPLITS = ['train', 'test']                   # các split
-PADDING = 20                                  # thêm viền xung quanh bbox
+INPUT_DIR = Path('data')
+OUTPUT_DIR = Path('data_rembg_2')
+SPLITS = ['Train_Alphabet', 'Test_Alphabet']
+PADDING = 20
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
+# Tạo folder đầu ra
 for split in SPLITS:
-    in_split = os.path.join(INPUT_DIR, split)
-    out_split = os.path.join(OUTPUT_DIR, split)
-    os.makedirs(out_split, exist_ok=True)
+    (OUTPUT_DIR / split).mkdir(parents=True, exist_ok=True)
 
-    for cls in os.listdir(in_split):
-        in_cls = os.path.join(in_split, cls)
-        out_cls = os.path.join(out_split, cls)
-        os.makedirs(out_cls, exist_ok=True)
-        
-        for fname in os.listdir(in_cls):
-            in_path = os.path.join(in_cls, fname)
-            out_path = os.path.join(out_cls, os.path.splitext(fname)[0] + '.png')
-            try:
-                # 1. Load ảnh và remove background
-                img = Image.open(in_path).convert("RGBA")
-                print(f"Processing {in_path} -> {out_path}")
-                img_no_bg = remove(img)  # PIL Image, mode RGBA
+def process_file(in_path: Path, out_path: Path, padding: int):
+    try:
+        # 1. Load ảnh và remove background
+        img = Image.open(in_path).convert("RGBA")
+        img_no_bg = remove(img)  # PIL Image, mode RGBA
 
-                # 2. Tính bounding box từ alpha channel
-                arr = np.array(img_no_bg)
-                alpha = arr[:, :, 3]
-                ys, xs = np.where(alpha > 0)
-                if len(xs) == 0 or len(ys) == 0:
-                    continue  # nếu không có vùng nào, bỏ qua
+        # 2. Tính bounding box từ alpha channel
+        arr = np.array(img_no_bg)
+        alpha = arr[..., 3]
+        ys, xs = np.where(alpha > 0)
+        if len(xs) == 0 or len(ys) == 0:
+            return f"Skipped (empty): {in_path}"
 
-                x1, x2 = xs.min(), xs.max()
-                y1, y2 = ys.min(), ys.max()
-                # thêm padding
-                x1 = max(x1 - PADDING, 0)
-                y1 = max(y1 - PADDING, 0)
-                x2 = min(x2 + PADDING, arr.shape[1])
-                y2 = min(y2 + PADDING, arr.shape[0])
+        x1, x2 = xs.min(), xs.max()
+        y1, y2 = ys.min(), ys.max()
+        # padding
+        x1, y1 = max(x1 - padding, 0), max(y1 - padding, 0)
+        x2 = min(x2 + padding, arr.shape[1])
+        y2 = min(y2 + padding, arr.shape[0])
 
-                # 3. Crop vùng tay
-                cropped = img_no_bg.crop((x1, y1, x2, y2))
+        # 3. Crop và chuyển nền trắng
+        cropped = img_no_bg.crop((x1, y1, x2, y2))
+        bg = Image.new("RGB", cropped.size, (255, 255, 255))
+        bg.paste(cropped, mask=cropped.split()[3])
 
-                # 4. (Tuỳ chọn) Chuyển về RGB với nền trắng
-                bg = Image.new("RGB", cropped.size, (255, 255, 255))
-                bg.paste(cropped, mask=cropped.split()[3])  # dùng alpha làm mask
+        # 4. Lưu ảnh
+        bg.save(out_path, optimize=True)
+        return f"Processed: {in_path}"
+    except Exception as e:
+        return f"Error {in_path}: {e}"
 
-                # 5. Lưu ảnh PNG (nền trắng) hoặc PNG có alpha nếu bạn muốn
-                bg.save(out_path)  
+def main():
+    # 1. Tạo danh sách tất cả các cặp (in_path, out_path)
+    tasks = []
+    for split in SPLITS:
+        in_split = INPUT_DIR / split
+        out_split = OUTPUT_DIR / split
+        for cls in os.listdir(in_split):
+            in_cls = in_split / cls
+            out_cls = out_split / cls
+            out_cls.mkdir(parents=True, exist_ok=True)
+            for fname in os.listdir(in_cls):
+                in_path = in_cls / fname
+                out_path = out_cls / (in_path.stem + '.png')
+                tasks.append((in_path, out_path))
 
-            except Exception as e:
-                print(f"Error processing {in_path}: {e}")
+    # 2. Chạy song song với ProcessPoolExecutor
+    with ProcessPoolExecutor() as executor:
+        futures = [
+            executor.submit(process_file, inp, outp, PADDING)
+            for inp, outp in tasks
+        ]
+        for fut in as_completed(futures):
+            print(fut.result())
+
+if __name__ == '__main__':
+    main()

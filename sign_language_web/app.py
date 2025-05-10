@@ -1,6 +1,7 @@
 import os
 from flask import Flask, render_template, request
 from werkzeug.utils import secure_filename
+from rembg import remove
 
 import cv2
 import mediapipe as mp
@@ -9,6 +10,7 @@ from torchvision import transforms
 from PIL import Image
 import json
 from torchvision.models import resnet18
+import numpy as np
 
 class SimpleCNN(torch.nn.Module):
     def __init__(self, num_classes):
@@ -54,24 +56,37 @@ mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(static_image_mode=True, max_num_hands=1)
 
 def crop_hand(image_bgr):
-    """Phát hiện và crop tay, trả về PIL Image."""
-    h, w, _ = image_bgr.shape
-    img_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-    results = hands.process(img_rgb)
-    if not results.multi_hand_landmarks:
+    """Dùng rembg để tách nền và crop bàn tay, trả về PIL.Image"""
+    try:
+        img_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+        pil_img = Image.fromarray(img_rgb).convert("RGBA")
+
+        # Tách nền
+        img_no_bg = remove(pil_img)
+
+        # Tìm vùng foreground từ alpha
+        arr = np.array(img_no_bg)
+        alpha = arr[:, :, 3]
+        ys, xs = np.where(alpha > 0)
+
+        if len(xs) == 0 or len(ys) == 0:
+            return None  # không có foreground
+
+        # Tính bounding box
+        pad = 20
+        x1, x2 = max(xs.min() - pad, 0), min(xs.max() + pad, arr.shape[1])
+        y1, y2 = max(ys.min() - pad, 0), min(ys.max() + pad, arr.shape[0])
+        cropped = img_no_bg.crop((x1, y1, x2, y2))
+
+        # Đổi nền trắng (tuỳ chọn)
+        bg = Image.new("RGB", cropped.size, (255, 255, 255))
+        bg.paste(cropped, mask=cropped.split()[3])  # alpha mask
+
+        return bg
+
+    except Exception as e:
+        print(f"[ERROR - crop_hand]: {e}")
         return None
-    # tìm bounding box
-    x_min, y_min = w, h
-    x_max = y_max = 0
-    for lm in results.multi_hand_landmarks[0].landmark:
-        x, y = int(lm.x * w), int(lm.y * h)
-        x_min, y_min = min(x_min, x), min(y_min, y)
-        x_max, y_max = max(x_max, x), max(y_max, y)
-    pad = 200
-    x_min, y_min = max(0, x_min - pad), max(0, y_min - pad)
-    x_max, y_max = min(w, x_max + pad), min(h, y_max + pad)
-    crop = image_bgr[y_min:y_max, x_min:x_max]
-    return Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
 
 # ====== Transforms & Model load ======
 transform = transforms.Compose([
