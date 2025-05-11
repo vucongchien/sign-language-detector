@@ -1,23 +1,266 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Sign Language Test</title>
-  </head>
-  <body>
-    <h1>🖐️ Test Sign Language Model</h1>
-    <form method="POST" enctype="multipart/form-data">
-      <input type="file" name="file" accept="image/*" required />
-      <input type="submit" value="Upload & Predict" />
-    </form>
-    {% if prediction %}
-    <h3>Top 3 Predictions:</h3>
-    <ul>
-      {% for label, prob in prediction %}
-      <li>{{ label }}: {{ '%.2f'|format(prob) }}%</li>
-      {% endfor %}
-    </ul>
-    <img src="{{ url_for('static', filename='uploads/' ~ request.files['file'].filename) }}" width="300">
-    {% endif %}
-  </body>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Nhận diện Ngôn ngữ Ký hiệu</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --primary-color: #2e86de;
+            --text-color: #2c3e50;
+            --bg-color: linear-gradient(135deg, #f0f8ff, #dff9fb);
+            --card-bg: #ffffff;
+            --border-color: #ccc;
+        }
+
+        body.dark {
+            --primary-color: #00a8ff;
+            --text-color: #f5f6fa;
+            --bg-color: #2f3640;
+            --card-bg: #353b48;
+            --border-color: #555;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            margin: 0;
+            background: var(--bg-color);
+            color: var(--text-color);
+            transition: background 0.3s, color 0.3s;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 32px;
+            margin-bottom: 30px;
+            color: var(--primary-color);
+        }
+
+        .section {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 40px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            transition: background 0.3s;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #1e6ab0;
+        }
+
+        video, img {
+            border-radius: 10px;
+            border: 2px solid var(--border-color);
+            max-width: 100%;
+            height: auto;
+        }
+
+        .result ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .result ul li {
+            margin-bottom: 8px;
+            font-weight: bold;
+            font-size: 17px;
+            color: var(--text-color);
+        }
+
+        #resultText {
+            font-size: 18px;
+            font-style: italic;
+            color: #c0392b;
+        }
+
+        .toggle-mode {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .toggle-mode button {
+            background-color: transparent;
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .toggle-mode button:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            button {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🖐️ NHẬN DIỆN NGÔN NGỮ KÝ HIỆU TỪ HÌNH ẢNH HOẶC CAMERA</h1>
+
+    <div class="toggle-mode">
+        <button onclick="toggleDarkMode()">🌙 Bật / Tắt Dark Mode</button>
+    </div>
+
+    <!-- Phần Dự đoán từ ảnh upload -->
+    <div class="section">
+        <h2>1️⃣ Dự đoán từ ảnh upload:</h2>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" accept="image/*" required>
+            <button type="submit">Tải lên & Dự đoán</button>
+        </form>
+
+        {% if prediction %}
+            <div class="result">
+                <h3>Kết quả dự đoán:</h3>
+                {% if prediction == "No hand detected" %}
+                    <p style="color: red;">🚫 Không phát hiện bàn tay trong ảnh.</p>
+                {% else %}
+                    <ul>
+                        {% for label, prob in prediction %}
+                            <li>➡️ <strong>{{ label }}</strong> – {{ '%.2f' % prob }}%</li>
+                        {% endfor %}
+                    </ul>
+                    <h4>Ảnh sau xử lý:</h4>
+                    <img src="{{ url_for('static', filename='uploads/' + filename) }}" width="200">
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Phần Dự đoán từ Camera -->
+    <div class="section">
+        <h2>2️⃣ Dự đoán từ Camera:</h2>
+
+        <button id="start-camera">🎥 Bật Camera</button>
+        <button id="stop-camera" style="display:none;">🛑 Tắt Camera</button><br><br>
+
+        <video id="webcam" autoplay playsinline width="320" height="240" style="display:none;"></video>
+        <canvas id="canvas" width="320" height="240" style="display:none;"></canvas><br>
+
+        <button id="capture-btn" onclick="captureAndSend()">📸 Chụp & Dự đoán</button>
+
+        <div id="result" style="margin-top: 20px;">
+            <h3>Kết quả dự đoán từ Camera:</h3>
+            <div id="resultText"></div>
+            <div class="result" id="camera-result"></div>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const startBtn = document.getElementById('start-camera');
+        const stopBtn = document.getElementById('stop-camera');
+        const captureBtn = document.getElementById('capture-btn');
+
+        // Bật camera
+        startBtn.addEventListener('click', () => {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    video.srcObject = stream;
+                    video.style.display = 'block';
+                    startBtn.style.display = 'none';
+                    stopBtn.style.display = 'inline-block';
+                    captureBtn.style.display = 'inline-block';
+                })
+                .catch(err => {
+                    console.error("Không thể bật camera: ", err);
+                    alert("Không thể truy cập camera.");
+                });
+        });
+
+        // Tắt camera
+        stopBtn.addEventListener('click', () => {
+            const stream = video.srcObject;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            video.srcObject = null;
+            video.style.display = 'none';
+            startBtn.style.display = 'inline-block';
+            stopBtn.style.display = 'none';
+            captureBtn.style.display = 'none';
+        });
+
+        // Chụp ảnh từ webcam và gửi tới Flask
+        function captureAndSend() {
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(blob => {
+                const formData = new FormData();
+                formData.append('file', blob, 'webcam.jpg');
+
+                fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    const resultDiv = document.getElementById('camera-result');
+                    const resultText = document.getElementById('resultText');
+
+                    if (data.prediction) {
+                        let html = `<h3>Kết quả dự đoán:</h3><ul>`;
+                        data.prediction.forEach(([label, prob]) => {
+                            html += `<li>🔤 <strong>${label}</strong> – ${prob.toFixed(2)}%</li>`;
+                        });
+                        html += `</ul>`;
+                        html += `<h4>Ảnh sau xử lý:</h4><img src="${data.image_url}?t=${new Date().getTime()}" width="200">`;
+                        resultDiv.innerHTML = html;
+                        resultText.innerHTML = '';
+                    } else {
+                        resultText.innerHTML = `<p style="color:red;">🚫 Không phát hiện ngôn ngữ ký hiệu.</p>`;
+                        resultDiv.innerHTML = '';
+                    }
+
+                    const stream = video.srcObject;
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+                    video.srcObject = null;
+                    video.style.display = 'none';
+                    startBtn.style.display = 'inline-block';
+                    stopBtn.style.display = 'none';
+                    captureBtn.style.display = 'none';
+                })
+                .catch(error => {
+                    console.error('Lỗi khi gửi yêu cầu:', error);
+                    document.getElementById('resultText').innerHTML = `<p style="color:red;">🚫 Đã có lỗi xảy ra khi dự đoán.</p>`;
+                });
+            }, 'image/jpeg', 0.95);
+        }
+
+        // Toggle Dark Mode
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark');
+        }
+    </script>
+</body>
 </html>

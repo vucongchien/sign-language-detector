@@ -8,6 +8,7 @@ import torchvision.transforms as transforms
 import json
 from model import SimpleCNN
 from torchvision.models import resnet18
+from model import SimpleCNN
 
 # === 0. Cấu hình chung ===
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -19,12 +20,12 @@ with open('sign_language_web/class_names.json', 'r', encoding='utf-8') as f:
 num_classes = len(class_names)
 
 # === 2. Load mô hình đã huấn luyện ===
-# model = SimpleCNN(num_classes).to(device)
+model = SimpleCNN(num_classes).to(device)
 # Nếu muốn dùng ResNet18 pretrained, bỏ comment khối này và comment CNN trên:
-model = resnet18(pretrained=False)
-model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+# model = resnet18(pretrained=False)
+# model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 
-model.load_state_dict(torch.load('sign_language_web/sign_language_model_resnes.pth', map_location=device))
+model.load_state_dict(torch.load('sign_language_web/sign_language_model_cnn.pth', map_location=device))
 model.eval()
 
 # === 3. Transform giống lúc validation ===
