@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 
-# Bỏ folder data (nếu không muốn đẩy dữ liệu lên GitHub)
 data/
 
 # Bỏ file notebook checkpoints
